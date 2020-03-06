@@ -34,13 +34,11 @@ true_A = torch.tensor([[-0.1, 2.0], [-2.0, -0.1]])
 class Lambda(nn.Module):
 
     def forward(self, t, y):
-        #return torch.mm(y**3, true_A)
         return torch.mm(y**3, true_A)
 
 
 with torch.no_grad():
     true_y = odeint(Lambda(), true_y0, t, method='dopri5')
-    #true_y = odeint(Lambda(), true_y0, t, method='adams')
 
 
 def get_batch():
@@ -116,19 +114,25 @@ class ODEFunc(nn.Module):
         super(ODEFunc, self).__init__()
 
         self.net = nn.Sequential(
-            nn.Linear(2, 50),
-            nn.Tanh(),
+            nn.Linear(2, 50),)
+            #nn.Dropout(0.001),
+        self.net2=  nn.Sequential(nn.Tanh(),
+            #nn.ReLU(),
             nn.Linear(50, 2),
         )
-
+        self.dropout = nn.Dropout(0.5)
+        self.nfe = 0
         for m in self.net.modules():
             if isinstance(m, nn.Linear):
                 nn.init.normal_(m.weight, mean=0, std=0.1)
                 nn.init.constant_(m.bias, val=0)
 
     def forward(self, t, y):
-        return self.net(y**3)
-
+        self.nfe=self.nfe + 1
+        if (self.nfe < 1000):
+            return self.net2(self.dropout(self.net(y**3)))
+        else:
+            return self.net2(self.net(y**3))
 
 class RunningAverageMeter(object):
     """Computes and stores the average and current value"""
@@ -164,6 +168,7 @@ if __name__ == '__main__':
         optimizer.zero_grad()
         batch_y0, batch_t, batch_y = get_batch()
         pred_y = odeint(func, batch_y0, batch_t)
+        func.nfe =0
         loss = torch.mean(torch.abs(pred_y - batch_y))
         loss.backward()
         optimizer.step()

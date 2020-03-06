@@ -26,7 +26,7 @@ else:
 
 device = torch.device('cuda:' + str(args.gpu) if torch.cuda.is_available() else 'cpu')
 
-true_y0 = torch.tensor([[2., 0.]])
+true_y0 = torch.tensor([[0.]])
 t = torch.linspace(0., 25., args.data_size)
 true_A = torch.tensor([[-0.1, 2.0], [-2.0, -0.1]])
 
@@ -34,8 +34,11 @@ true_A = torch.tensor([[-0.1, 2.0], [-2.0, -0.1]])
 class Lambda(nn.Module):
 
     def forward(self, t, y):
+        t = t.unsqueeze(0)
+        equation = -1000*y + 3000 - 2000 * torch.exp(-t)
+        return equation
         #return torch.mm(y**3, true_A)
-        return torch.mm(y**3, true_A)
+        #return torch.mm(y**3, true_A)
 
 
 with torch.no_grad():
@@ -62,7 +65,7 @@ if args.viz:
     fig = plt.figure(figsize=(12, 4), facecolor='white')
     ax_traj = fig.add_subplot(131, frameon=False)
     ax_phase = fig.add_subplot(132, frameon=False)
-    ax_vecfield = fig.add_subplot(133, frameon=False)
+    #ax_vecfield = fig.add_subplot(133, frameon=False)
     plt.show(block=False)
 
 
@@ -71,38 +74,49 @@ def visualize(true_y, pred_y, odefunc, itr):
     if args.viz:
 
         ax_traj.cla()
-        ax_traj.set_title('Trajectories')
+        ax_traj.set_title('True vs Predicted')
         ax_traj.set_xlabel('t')
-        ax_traj.set_ylabel('x,y')
-        ax_traj.plot(t.numpy(), true_y.numpy()[:, 0, 0], t.numpy(), true_y.numpy()[:, 0, 1], 'g-')
-        ax_traj.plot(t.numpy(), pred_y.numpy()[:, 0, 0], '--', t.numpy(), pred_y.numpy()[:, 0, 1], 'b--')
+        ax_traj.set_ylabel('y')
+        ax_traj.plot(t.numpy(), true_y.numpy()[:, 0], 'g-')
+        ax_traj.plot(t.numpy(), pred_y.numpy()[:, 0], '--', 'b--')
         ax_traj.set_xlim(t.min(), t.max())
-        ax_traj.set_ylim(-2, 2)
+        ax_traj.set_ylim(-10, 10)
         ax_traj.legend()
 
         ax_phase.cla()
-        ax_phase.set_title('Phase Portrait')
-        ax_phase.set_xlabel('x')
+        ax_phase.set_title('Predicted')
+        ax_phase.set_xlabel('t')
         ax_phase.set_ylabel('y')
-        ax_phase.plot(true_y.numpy()[:, 0, 0], true_y.numpy()[:, 0, 1], 'g-')
-        ax_phase.plot(pred_y.numpy()[:, 0, 0], pred_y.numpy()[:, 0, 1], 'b--')
-        ax_phase.set_xlim(-2, 2)
-        ax_phase.set_ylim(-2, 2)
+        ax_phase.plot(t.numpy(), pred_y.numpy()[:, 0], '--', 'b--')
+        ax_phase.set_xlim(t.min(), t.max())
+        ax_phase.set_ylim(-10, 10)
+        ax_phase.legend()
 
-        ax_vecfield.cla()
-        ax_vecfield.set_title('Learned Vector Field')
-        ax_vecfield.set_xlabel('x')
-        ax_vecfield.set_ylabel('y')
 
-        y, x = np.mgrid[-2:2:21j, -2:2:21j]
-        dydt = odefunc(0, torch.Tensor(np.stack([x, y], -1).reshape(21 * 21, 2))).cpu().detach().numpy()
-        mag = np.sqrt(dydt[:, 0]**2 + dydt[:, 1]**2).reshape(-1, 1)
-        dydt = (dydt / mag)
-        dydt = dydt.reshape(21, 21, 2)
 
-        ax_vecfield.streamplot(x, y, dydt[:, :, 0], dydt[:, :, 1], color="black")
-        ax_vecfield.set_xlim(-2, 2)
-        ax_vecfield.set_ylim(-2, 2)
+        #ax_phase.cla()
+        #ax_phase.set_title('Phase Portrait')
+        #ax_phase.set_xlabel('x')
+        #ax_phase.set_ylabel('y')
+        #ax_phase.plot(true_y.numpy()[:, 0, 0], true_y.numpy()[:, 0, 1], 'g-')
+        #ax_phase.plot(pred_y.numpy()[:, 0, 0], pred_y.numpy()[:, 0, 1], 'b--')
+        #ax_phase.set_xlim(-2, 2)
+        #ax_phase.set_ylim(-2, 2)
+
+        #ax_vecfield.cla()
+        #ax_vecfield.set_title('Learned Vector Field')
+        #ax_vecfield.set_xlabel('x')
+        #ax_vecfield.set_ylabel('y')
+
+        #y, x = np.mgrid[-2:2:21j, -2:2:21j]
+        #dydt = odefunc(0, torch.Tensor(np.stack([x, y], -1).reshape(21 * 21, 2))).cpu().detach().numpy()
+        #mag = np.sqrt(dydt[:, 0]**2 + dydt[:, 1]**2).reshape(-1, 1)
+        #dydt = (dydt / mag)
+        #dydt = dydt.reshape(21, 21, 2)
+
+        #ax_vecfield.streamplot(x, y, dydt[:, :, 0], dydt[:, :, 1], color="black")
+        #ax_vecfield.set_xlim(-2, 2)
+        #ax_vecfield.set_ylim(-2, 2)
 
         fig.tight_layout()
         plt.savefig('png/{:03d}'.format(itr))
@@ -116,9 +130,9 @@ class ODEFunc(nn.Module):
         super(ODEFunc, self).__init__()
 
         self.net = nn.Sequential(
-            nn.Linear(2, 50),
+            nn.Linear(1, 50),
             nn.Tanh(),
-            nn.Linear(50, 2),
+            nn.Linear(50, 1),
         )
 
         for m in self.net.modules():
@@ -127,8 +141,10 @@ class ODEFunc(nn.Module):
                 nn.init.constant_(m.bias, val=0)
 
     def forward(self, t, y):
-        return self.net(y**3)
-
+        t=t.unsqueeze(0)
+        #return self.net(t**3)
+        equation = -1000*y + 3000 - 2000 * torch.exp(-t)
+        return self.net(equation)
 
 class RunningAverageMeter(object):
     """Computes and stores the average and current value"""

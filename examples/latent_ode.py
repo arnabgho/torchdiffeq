@@ -49,7 +49,7 @@ def generate_spiral2d(nspiral=1000,
       a, b: parameters of the Archimedean spiral
       savefig: plot the ground truth for sanity check
 
-    Returns: 
+    Returns:
       Tuple where first element is true trajectory of size (nspiral, ntotal, 2),
       second element is noisy observations of size (nspiral, nsample, 2),
       third element is timestamps of size (ntotal,),
