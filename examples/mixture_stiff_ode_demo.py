@@ -2,7 +2,7 @@ import os
 import argparse
 import time
 import numpy as np
-
+import copy
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -12,6 +12,7 @@ parser.add_argument('--method', type=str, choices=['dopri5', 'adams'], default='
 parser.add_argument('--data_size', type=int, default=1000)
 parser.add_argument('--batch_time', type=int, default=10)
 parser.add_argument('--batch_size', type=int, default=20)
+parser.add_argument('--num_components', type=int, default=2)
 parser.add_argument('--niters', type=int, default=2000)
 parser.add_argument('--test_freq', type=int, default=20)
 parser.add_argument('--viz', action='store_true')
@@ -35,9 +36,7 @@ class Lambda(nn.Module):
 
     def forward(self, t, y):
         t = t.unsqueeze(0)
-        equation = -1000*y + 3000 - 2000 * torch.exp(-t) + 1000 * torch.sin(t)
-        #equation = -1000*y + 3000 - 2000 * torch.exp(-t)
-        #equation = 10 * torch.sin(t)
+        equation = -1000*y + 3000 - 2000 * torch.exp(-t)
         return equation
         #return torch.mm(y**3, true_A)
         #return torch.mm(y**3, true_A)
@@ -82,7 +81,7 @@ def visualize(true_y, pred_y, odefunc, itr):
         ax_traj.plot(t.numpy(), true_y.numpy()[:, 0], 'g-')
         ax_traj.plot(t.numpy(), pred_y.numpy()[:, 0], '--', 'b--')
         ax_traj.set_xlim(t.min(), t.max())
-        ax_traj.set_ylim(-100, 100)
+        ax_traj.set_ylim(-10, 10)
         ax_traj.legend()
 
         ax_phase.cla()
@@ -91,7 +90,7 @@ def visualize(true_y, pred_y, odefunc, itr):
         ax_phase.set_ylabel('y')
         ax_phase.plot(t.numpy(), pred_y.numpy()[:, 0], '--', 'b--')
         ax_phase.set_xlim(t.min(), t.max())
-        ax_phase.set_ylim(-100, 100)
+        ax_phase.set_ylim(-10, 10)
         ax_phase.legend()
 
 
@@ -131,24 +130,37 @@ class ODEFunc(nn.Module):
     def __init__(self):
         super(ODEFunc, self).__init__()
 
-        self.net = nn.Sequential(
+        self.nets = nn.ModuleList()
+
+        net = nn.Sequential(
             nn.Linear(1, 500),
             nn.Tanh(),
             nn.Linear(500, 1),
         )
 
-        for m in self.net.modules():
+        for m in net.modules():
             if isinstance(m, nn.Linear):
                 nn.init.normal_(m.weight, mean=0, std=0.1)
                 nn.init.constant_(m.bias, val=0)
 
+        state = net.state_dict()
+        self.nets.append(net)
+
+        for i in range(args.num_components-1):
+            state_clone = copy.deepcopy(state)
+            net.load_state_dict(state_clone)
+            self.nets.append(net)
+
+
     def forward(self, t, y):
         t=t.unsqueeze(0)
         #return self.net(t**3)
-        equation = -1000*y + 3000 - 2000 * torch.exp(-t) + 1000 * torch.sin(t)
-        #equation = -1000*y + 3000 - 2000 * torch.exp(-t)
-        #equation =  10 * torch.sin(t)
-        return self.net(equation)
+        equation = -1000*y + 3000 - 2000 * torch.exp(-t)
+
+        res = 0
+        for i in range(args.num_components):
+            res = res + self.nets[i](equation)
+        return res
 
 class RunningAverageMeter(object):
     """Computes and stores the average and current value"""

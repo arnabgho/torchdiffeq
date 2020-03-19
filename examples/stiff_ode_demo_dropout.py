@@ -35,9 +35,7 @@ class Lambda(nn.Module):
 
     def forward(self, t, y):
         t = t.unsqueeze(0)
-        equation = -1000*y + 3000 - 2000 * torch.exp(-t) + 1000 * torch.sin(t)
-        #equation = -1000*y + 3000 - 2000 * torch.exp(-t)
-        #equation = 10 * torch.sin(t)
+        equation = -1000*y + 3000 - 2000 * torch.exp(-t)
         return equation
         #return torch.mm(y**3, true_A)
         #return torch.mm(y**3, true_A)
@@ -82,7 +80,7 @@ def visualize(true_y, pred_y, odefunc, itr):
         ax_traj.plot(t.numpy(), true_y.numpy()[:, 0], 'g-')
         ax_traj.plot(t.numpy(), pred_y.numpy()[:, 0], '--', 'b--')
         ax_traj.set_xlim(t.min(), t.max())
-        ax_traj.set_ylim(-100, 100)
+        ax_traj.set_ylim(-10, 10)
         ax_traj.legend()
 
         ax_phase.cla()
@@ -91,7 +89,7 @@ def visualize(true_y, pred_y, odefunc, itr):
         ax_phase.set_ylabel('y')
         ax_phase.plot(t.numpy(), pred_y.numpy()[:, 0], '--', 'b--')
         ax_phase.set_xlim(t.min(), t.max())
-        ax_phase.set_ylim(-100, 100)
+        ax_phase.set_ylim(-10, 10)
         ax_phase.legend()
 
 
@@ -121,7 +119,7 @@ def visualize(true_y, pred_y, odefunc, itr):
         #ax_vecfield.set_ylim(-2, 2)
 
         fig.tight_layout()
-        plt.savefig('png/{:04d}'.format(itr))
+        plt.savefig('png/{:03d}'.format(itr))
         plt.draw()
         plt.pause(0.001)
 
@@ -132,10 +130,13 @@ class ODEFunc(nn.Module):
         super(ODEFunc, self).__init__()
 
         self.net = nn.Sequential(
-            nn.Linear(1, 500),
-            nn.Tanh(),
-            nn.Linear(500, 1),
+            nn.Linear(1, 50),)
+            #nn.Dropout(0.001),
+        self.net2=  nn.Sequential(nn.Tanh(),
+            #nn.ReLU(),
+            nn.Linear(50, 1),
         )
+        self.dropout = nn.Dropout(0.5)
 
         for m in self.net.modules():
             if isinstance(m, nn.Linear):
@@ -145,10 +146,8 @@ class ODEFunc(nn.Module):
     def forward(self, t, y):
         t=t.unsqueeze(0)
         #return self.net(t**3)
-        equation = -1000*y + 3000 - 2000 * torch.exp(-t) + 1000 * torch.sin(t)
-        #equation = -1000*y + 3000 - 2000 * torch.exp(-t)
-        #equation =  10 * torch.sin(t)
-        return self.net(equation)
+        equation = -1000*y + 3000 - 2000 * torch.exp(-t)
+        return self.net2( self.dropout(self.net(  equation)))
 
 class RunningAverageMeter(object):
     """Computes and stores the average and current value"""
