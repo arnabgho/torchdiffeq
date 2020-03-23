@@ -2,7 +2,7 @@ import os
 import argparse
 import time
 import numpy as np
-
+import copy
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -12,6 +12,7 @@ parser.add_argument('--method', type=str, choices=['dopri5', 'adams'], default='
 parser.add_argument('--data_size', type=int, default=1000)
 parser.add_argument('--batch_time', type=int, default=10)
 parser.add_argument('--batch_size', type=int, default=20)
+parser.add_argument('--num_components', type=int, default=2)
 parser.add_argument('--niters', type=int, default=2000)
 parser.add_argument('--test_freq', type=int, default=20)
 parser.add_argument('--viz', action='store_true')
@@ -35,9 +36,8 @@ class Lambda(nn.Module):
 
     def forward(self, t, y):
         t = t.unsqueeze(0)
-        #equation = -1000*y + 3000 - 2000 * torch.exp(-t) #+ 1000 * torch.sin(t)
         #equation = -1000*y + 3000 - 2000 * torch.exp(-t)
-        equation = 10 * torch.sin(t)
+        equation = 10*torch.sin(t) #-1000*y + 3000 - 2000 * torch.exp(-t)
         return equation
         #return torch.mm(y**3, true_A)
         #return torch.mm(y**3, true_A)
@@ -62,7 +62,7 @@ def makedirs(dirname):
 
 
 if args.viz:
-    makedirs('png_alternate')
+    makedirs('png_alternate_mad')
     import matplotlib.pyplot as plt
     fig = plt.figure(figsize=(12, 4), facecolor='white')
     ax_traj = fig.add_subplot(131, frameon=False)
@@ -82,7 +82,7 @@ def visualize(true_y, pred_y, odefunc, itr):
         ax_traj.plot(t.numpy(), true_y.numpy()[:, 0], 'g-')
         ax_traj.plot(t.numpy(), pred_y.numpy()[:, 0], '--', 'b--')
         ax_traj.set_xlim(t.min(), t.max())
-        ax_traj.set_ylim(-100, 100)
+        ax_traj.set_ylim(-10, 10)
         ax_traj.legend()
 
         ax_phase.cla()
@@ -91,39 +91,58 @@ def visualize(true_y, pred_y, odefunc, itr):
         ax_phase.set_ylabel('y')
         ax_phase.plot(t.numpy(), pred_y.numpy()[:, 0], '--', 'b--')
         ax_phase.set_xlim(t.min(), t.max())
-        ax_phase.set_ylim(-100, 100)
+        ax_phase.set_ylim(-10, 10)
         ax_phase.legend()
 
 
-
-        #ax_phase.cla()
-        #ax_phase.set_title('Phase Portrait')
-        #ax_phase.set_xlabel('x')
-        #ax_phase.set_ylabel('y')
-        #ax_phase.plot(true_y.numpy()[:, 0, 0], true_y.numpy()[:, 0, 1], 'g-')
-        #ax_phase.plot(pred_y.numpy()[:, 0, 0], pred_y.numpy()[:, 0, 1], 'b--')
-        #ax_phase.set_xlim(-2, 2)
-        #ax_phase.set_ylim(-2, 2)
-
-        #ax_vecfield.cla()
-        #ax_vecfield.set_title('Learned Vector Field')
-        #ax_vecfield.set_xlabel('x')
-        #ax_vecfield.set_ylabel('y')
-
-        #y, x = np.mgrid[-2:2:21j, -2:2:21j]
-        #dydt = odefunc(0, torch.Tensor(np.stack([x, y], -1).reshape(21 * 21, 2))).cpu().detach().numpy()
-        #mag = np.sqrt(dydt[:, 0]**2 + dydt[:, 1]**2).reshape(-1, 1)
-        #dydt = (dydt / mag)
-        #dydt = dydt.reshape(21, 21, 2)
-
-        #ax_vecfield.streamplot(x, y, dydt[:, :, 0], dydt[:, :, 1], color="black")
-        #ax_vecfield.set_xlim(-2, 2)
-        #ax_vecfield.set_ylim(-2, 2)
-
         fig.tight_layout()
-        plt.savefig('png_alternate/{:04d}'.format(itr))
+        plt.savefig('png_alternate_mad/{:04d}'.format(itr))
         plt.draw()
         plt.pause(0.001)
+
+
+#class ODEFunc(nn.Module):
+#
+#    def __init__(self):
+#        super(ODEFunc, self).__init__()
+#
+#        self.nets = nn.ModuleList()
+#
+#        net = nn.Sequential(
+#            nn.Linear(2, 500),
+#            nn.Tanh(),
+#            nn.Linear(500, 1),
+#        )
+#
+#        for m in net.modules():
+#            if isinstance(m, nn.Linear):
+#                nn.init.normal_(m.weight, mean=0, std=0.1)
+#                nn.init.constant_(m.bias, val=0)
+#
+#        state = net.state_dict()
+#        self.nets.append(net)
+#
+#        for i in range(args.num_components-1):
+#            state_clone = copy.deepcopy(state)
+#            net.load_state_dict(state_clone)
+#            self.nets.append(net)
+#
+#
+#    def forward(self, t, y):
+#        t=t.unsqueeze(0)
+#        t = t.view(1,1)
+#        y = y.view(y.size(0),1)
+#        t = t.expand_as(y)
+#        equation = torch.cat([t,y],1)
+#
+#        result = 0
+#
+#        for i in range(args.num_components):
+#            result = result + self.nets[i](equation)
+#
+#        if y.size(0)==1:
+#            result = result.squeeze()
+#        return result
 
 
 class ODEFunc(nn.Module):
@@ -156,6 +175,8 @@ class ODEFunc(nn.Module):
             result = result.squeeze()
         return result
 
+
+
 class RunningAverageMeter(object):
     """Computes and stores the average and current value"""
 
@@ -179,27 +200,49 @@ if __name__ == '__main__':
 
     ii = 0
 
+    funcs = []
     func = ODEFunc()
-    optimizer = optim.RMSprop(func.parameters(), lr=1e-3)
+    state = func.state_dict()
+    funcs.append(func)
+
+    for i in range(args.num_components-1):
+        state_clone = copy.deepcopy(state)
+        func = ODEFunc()
+        func.load_state_dict(state_clone)
+        funcs.append(func)
+
+    optimizers = []
+    for i in range(args.num_components):
+        optimizers.append(optim.RMSprop(funcs[i].parameters(), lr=1e-3))
     end = time.time()
 
     time_meter = RunningAverageMeter(0.97)
     loss_meter = RunningAverageMeter(0.97)
 
     for itr in range(1, args.niters + 1):
-        optimizer.zero_grad()
+        for i in range(args.num_components):
+            optimizers[i].zero_grad()
         batch_y0, batch_t, batch_y = get_batch()
-        pred_y = odeint(func, batch_y0, batch_t)
+        pred_y = odeint(funcs[0], batch_y0, batch_t)
+
+        for i in range(args.num_components-1):
+            pred_y = pred_y + odeint(funcs[i],batch_y0,batch_t)
+
         loss = torch.mean(torch.abs(pred_y - batch_y))
         loss.backward()
-        optimizer.step()
+        for i in range(args.num_components):
+            optimizers[i].step()
 
         time_meter.update(time.time() - end)
         loss_meter.update(loss.item())
 
         if itr % args.test_freq == 0:
             with torch.no_grad():
-                pred_y = odeint(func, true_y0, t)
+                pred_y = odeint(funcs[0], true_y0, t)
+
+                for i in range(args.num_components-1):
+                    pred_y = pred_y + odeint(funcs[i],true_y0,t)
+
                 loss = torch.mean(torch.abs(pred_y - true_y))
                 print('Iter {:04d} | Total Loss {:.6f}'.format(itr, loss.item()))
                 visualize(true_y, pred_y, func, ii)
