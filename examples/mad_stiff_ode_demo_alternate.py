@@ -37,8 +37,8 @@ class Lambda(nn.Module):
 
     def forward(self, t, y):
         t = t.unsqueeze(0)
-        #equation = -1000*y + 3000 - 2000 * torch.exp(-t)
-        equation = 10*torch.sin(t) #-1000*y + 3000 - 2000 * torch.exp(-t)
+        equation = -1000*y + 3000 - 2000 * torch.exp(-t)
+        #equation = 10*torch.sin(t) #-1000*y + 3000 - 2000 * torch.exp(-t)
         return equation
         #return torch.mm(y**3, true_A)
         #return torch.mm(y**3, true_A)
@@ -189,6 +189,8 @@ if __name__ == '__main__':
     optimizers = []
     for i in range(args.num_components):
         optimizers.append(optim.RMSprop(funcs[i].parameters(), lr=1e-3))
+
+    optimizer_guide = optim.RMSprop(guide.parameters(),lr=1e-3)
     end = time.time()
 
     time_meter = RunningAverageMeter(0.97)
@@ -197,13 +199,14 @@ if __name__ == '__main__':
     for itr in range(1, args.niters + 1):
         for i in range(args.num_components):
             optimizers[i].zero_grad()
+        optimizer_guide.zero_grad()
         batch_y0, batch_t, batch_y = get_batch()
         pred_ys=[]
         pred_y = odeint(funcs[0], batch_y0, batch_t)
         pred_ys.append(pred_y)
         for i in range(args.num_components-1):
-            pred_y = pred_y + odeint(funcs[i],batch_y0,batch_t)
-            pred_ys.append(pred_y)
+            pred_ys.append(odeint(funcs[i],batch_y0,batch_t))
+            pred_y += pred_ys[-1]
         # pred_y size : (args.batch_time,args.batch_size,1)
 
         which_one = np.random.randint(0,args.num_components)
@@ -215,7 +218,7 @@ if __name__ == '__main__':
         loss.backward()
         for i in range(args.num_components):
             optimizers[i].step()
-
+        optimizer_guide.step()
         time_meter.update(time.time() - end)
         loss_meter.update(loss.item())
 
@@ -224,15 +227,16 @@ if __name__ == '__main__':
                 pred_ys = []
                 pred_y = odeint(funcs[0], true_y0, t)
                 pred_ys.append(pred_y)
-
+                sum_pred_y = pred_y
                 for i in range(args.num_components-1):
                     pred_ys.append( odeint(funcs[i],true_y0,t) )
                     pred_y = pred_ys[-1]
+                    sum_pred_y += pred_y
 
-                loss = torch.mean(torch.abs(pred_y - true_y))
+                loss = torch.mean(torch.abs(sum_pred_y - true_y))
                 print('Iter {:04d} | Total Loss {:.6f}'.format(itr, loss.item()))
                 for i in range(args.num_components):
-                    visualize(true_y, pred_y, func, ii,i)
+                    visualize(true_y, pred_ys[i], func, ii,i)
                 ii += 1
 
         end = time.time()
