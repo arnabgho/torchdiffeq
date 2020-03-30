@@ -22,7 +22,7 @@ args = parser.parse_args()
 if args.adjoint:
     from torchdiffeq import odeint_adjoint as odeint
 else:
-    from torchdiffeq import odeint
+    from torchdiffeq import odeint, odeint_skip_step
 
 device = torch.device('cuda:' + str(args.gpu) if torch.cuda.is_available() else 'cpu')
 
