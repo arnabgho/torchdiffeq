@@ -62,16 +62,18 @@ def makedirs(dirname):
 
 
 if args.viz:
-    makedirs('png_alternate_mad')
+    makedirs('png_alternate_mixture')
     import matplotlib.pyplot as plt
     fig = plt.figure(figsize=(12, 4), facecolor='white')
     ax_traj = fig.add_subplot(131, frameon=False)
-    ax_phase = fig.add_subplot(132, frameon=False)
+    ax_phase=[]
+    for i in range(args.num_components):
+        ax_phase.append( fig.add_subplot(132+i, frameon=False) )
     #ax_vecfield = fig.add_subplot(133, frameon=False)
     plt.show(block=False)
 
 
-def visualize(true_y, pred_y, odefunc, itr):
+def visualize(true_y,pred_y, pred_ys, odefunc, itr):
 
     if args.viz:
 
@@ -85,64 +87,23 @@ def visualize(true_y, pred_y, odefunc, itr):
         ax_traj.set_ylim(-10, 10)
         ax_traj.legend()
 
-        ax_phase.cla()
-        ax_phase.set_title('Predicted')
-        ax_phase.set_xlabel('t')
-        ax_phase.set_ylabel('y')
-        ax_phase.plot(t.numpy(), pred_y.numpy()[:, 0], '--', 'b--')
-        ax_phase.set_xlim(t.min(), t.max())
-        ax_phase.set_ylim(-10, 10)
-        ax_phase.legend()
+        for i in range(args.num_components):
+            ax_phase[i].cla()
+            ax_phase[i].set_title('Component_' + str(i)  )
+            ax_phase[i].set_xlabel('t')
+            ax_phase[i].set_ylabel('y')
+            ax_phase[i].plot(t.numpy(), true_y.numpy()[:, 0], 'g-')
+            ax_phase[i].plot(t.numpy(), pred_ys[i].numpy()[:, 0], '--', 'b--')
+            ax_phase[i].set_xlim(t.min(), t.max())
+            ax_phase[i].set_ylim(-10, 10)
+            ax_phase[i].legend()
 
 
         fig.tight_layout()
-        plt.savefig('png_alternate_mad/{:04d}'.format(itr))
+        plt.savefig('png_alternate_mixture/{:04d}'.format(itr))
         plt.draw()
         plt.pause(0.001)
 
-
-#class ODEFunc(nn.Module):
-#
-#    def __init__(self):
-#        super(ODEFunc, self).__init__()
-#
-#        self.nets = nn.ModuleList()
-#
-#        net = nn.Sequential(
-#            nn.Linear(2, 500),
-#            nn.Tanh(),
-#            nn.Linear(500, 1),
-#        )
-#
-#        for m in net.modules():
-#            if isinstance(m, nn.Linear):
-#                nn.init.normal_(m.weight, mean=0, std=0.1)
-#                nn.init.constant_(m.bias, val=0)
-#
-#        state = net.state_dict()
-#        self.nets.append(net)
-#
-#        for i in range(args.num_components-1):
-#            state_clone = copy.deepcopy(state)
-#            net.load_state_dict(state_clone)
-#            self.nets.append(net)
-#
-#
-#    def forward(self, t, y):
-#        t=t.unsqueeze(0)
-#        t = t.view(1,1)
-#        y = y.view(y.size(0),1)
-#        t = t.expand_as(y)
-#        equation = torch.cat([t,y],1)
-#
-#        result = 0
-#
-#        for i in range(args.num_components):
-#            result = result + self.nets[i](equation)
-#
-#        if y.size(0)==1:
-#            result = result.squeeze()
-#        return result
 
 
 class ODEFunc(nn.Module):
@@ -223,12 +184,16 @@ if __name__ == '__main__':
         for i in range(args.num_components):
             optimizers[i].zero_grad()
         batch_y0, batch_t, batch_y = get_batch()
+
+        pred_ys=[]
         pred_y = odeint(funcs[0], batch_y0, batch_t)
-
+        pred_ys.append(pred_y)
         for i in range(args.num_components-1):
-            pred_y = pred_y + odeint(funcs[i],batch_y0,batch_t)
+            pred_ys.append(odeint(funcs[i],batch_y0,batch_t))
+            pred_y += pred_ys[-1]
 
-        loss = torch.mean(torch.abs(pred_y - batch_y))
+
+        loss = torch.mean(torch.abs(sum(pred_ys) - batch_y))
         loss.backward()
         for i in range(args.num_components):
             optimizers[i].step()
@@ -238,14 +203,16 @@ if __name__ == '__main__':
 
         if itr % args.test_freq == 0:
             with torch.no_grad():
+                pred_ys = []
                 pred_y = odeint(funcs[0], true_y0, t)
-
+                pred_ys.append(pred_y)
                 for i in range(args.num_components-1):
-                    pred_y = pred_y + odeint(funcs[i],true_y0,t)
+                    pred_ys.append( odeint(funcs[i],true_y0,t) )
+                    pred_y += pred_ys[-1]
 
-                loss = torch.mean(torch.abs(pred_y - true_y))
-                print('Iter {:04d} | Total Loss {:.6f}'.format(itr, loss.item()))
-                visualize(true_y, pred_y, func, ii)
+                diff = torch.mean(torch.abs(sum(pred_ys) - true_y))
+                print('Iter {:04d} | Total Loss {:.6f}'.format(itr, diff.item()))
+                visualize(true_y,sum(pred_ys), pred_ys, func, ii)
                 ii += 1
 
         end = time.time()

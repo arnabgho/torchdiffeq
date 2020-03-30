@@ -37,8 +37,8 @@ class Lambda(nn.Module):
 
     def forward(self, t, y):
         t = t.unsqueeze(0)
-        equation = -1000*y + 3000 - 2000 * torch.exp(-t)
-        #equation = 10*torch.sin(t) #-1000*y + 3000 - 2000 * torch.exp(-t)
+        #equation = -1000*y + 3000 - 2000 * torch.exp(-t)
+        equation = 10*torch.sin(t) #-1000*y + 3000 - 2000 * torch.exp(-t)
         return equation
         #return torch.mm(y**3, true_A)
         #return torch.mm(y**3, true_A)
@@ -62,17 +62,20 @@ def makedirs(dirname):
         os.makedirs(dirname)
 
 
+
 if args.viz:
     makedirs('png_alternate_mad')
     import matplotlib.pyplot as plt
     fig = plt.figure(figsize=(12, 4), facecolor='white')
     ax_traj = fig.add_subplot(131, frameon=False)
-    ax_phase = fig.add_subplot(132, frameon=False)
+    ax_phase=[]
+    for i in range(args.num_components):
+        ax_phase.append( fig.add_subplot(132+i, frameon=False) )
     #ax_vecfield = fig.add_subplot(133, frameon=False)
     plt.show(block=False)
 
 
-def visualize(true_y, pred_y, odefunc, itr, which_one=0):
+def visualize(true_y,pred_y, pred_ys, odefunc, itr):
 
     if args.viz:
 
@@ -86,18 +89,20 @@ def visualize(true_y, pred_y, odefunc, itr, which_one=0):
         ax_traj.set_ylim(-10, 10)
         ax_traj.legend()
 
-        ax_phase.cla()
-        ax_phase.set_title('Predicted')
-        ax_phase.set_xlabel('t')
-        ax_phase.set_ylabel('y')
-        ax_phase.plot(t.numpy(), pred_y.numpy()[:, 0], '--', 'b--')
-        ax_phase.set_xlim(t.min(), t.max())
-        ax_phase.set_ylim(-10, 10)
-        ax_phase.legend()
+        for i in range(args.num_components):
+            ax_phase[i].cla()
+            ax_phase[i].set_title('Component_' + str(i)  )
+            ax_phase[i].set_xlabel('t')
+            ax_phase[i].set_ylabel('y')
+            ax_phase[i].plot(t.numpy(), true_y.numpy()[:, 0], 'g-')
+            ax_phase[i].plot(t.numpy(), pred_ys[i].numpy()[:, 0], '--', 'b--')
+            ax_phase[i].set_xlim(t.min(), t.max())
+            ax_phase[i].set_ylim(-10, 10)
+            ax_phase[i].legend()
 
 
         fig.tight_layout()
-        plt.savefig('png_alternate_mad/{:04d}_{:02d}'.format(itr,which_one))
+        plt.savefig('png_alternate_mad/{:04d}'.format(itr))
         plt.draw()
         plt.pause(0.001)
 
@@ -214,7 +219,7 @@ if __name__ == '__main__':
         pred_which_one = guide( pred_ys[which_one]  )
         true_which_one = torch.zeros(pred_which_one.size(0)).long().fill_(which_one)
 
-        loss = torch.mean(torch.abs(pred_y - batch_y)) + criterion_guider(pred_which_one,true_which_one)
+        loss = torch.mean(torch.abs(sum(pred_ys) - batch_y)) + criterion_guider(pred_which_one,true_which_one)
         loss.backward()
         for i in range(args.num_components):
             optimizers[i].step()
@@ -227,16 +232,13 @@ if __name__ == '__main__':
                 pred_ys = []
                 pred_y = odeint(funcs[0], true_y0, t)
                 pred_ys.append(pred_y)
-                sum_pred_y = pred_y
                 for i in range(args.num_components-1):
                     pred_ys.append( odeint(funcs[i],true_y0,t) )
-                    pred_y = pred_ys[-1]
-                    sum_pred_y += pred_y
+                    pred_y += pred_ys[-1]
 
-                loss = torch.mean(torch.abs(sum_pred_y - true_y))
-                print('Iter {:04d} | Total Loss {:.6f}'.format(itr, loss.item()))
-                for i in range(args.num_components):
-                    visualize(true_y, pred_ys[i], func, ii,i)
+                diff = torch.mean(torch.abs(sum(pred_ys) - true_y))
+                print('Iter {:04d} | Total Loss {:.6f}'.format(itr, diff.item()))
+                visualize(true_y,sum(pred_ys), pred_ys, func, ii)
                 ii += 1
 
         end = time.time()

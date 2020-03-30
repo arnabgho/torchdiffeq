@@ -94,32 +94,6 @@ def visualize(true_y, pred_y, odefunc, itr):
         ax_phase.set_ylim(-100, 100)
         ax_phase.legend()
 
-
-
-        #ax_phase.cla()
-        #ax_phase.set_title('Phase Portrait')
-        #ax_phase.set_xlabel('x')
-        #ax_phase.set_ylabel('y')
-        #ax_phase.plot(true_y.numpy()[:, 0, 0], true_y.numpy()[:, 0, 1], 'g-')
-        #ax_phase.plot(pred_y.numpy()[:, 0, 0], pred_y.numpy()[:, 0, 1], 'b--')
-        #ax_phase.set_xlim(-2, 2)
-        #ax_phase.set_ylim(-2, 2)
-
-        #ax_vecfield.cla()
-        #ax_vecfield.set_title('Learned Vector Field')
-        #ax_vecfield.set_xlabel('x')
-        #ax_vecfield.set_ylabel('y')
-
-        #y, x = np.mgrid[-2:2:21j, -2:2:21j]
-        #dydt = odefunc(0, torch.Tensor(np.stack([x, y], -1).reshape(21 * 21, 2))).cpu().detach().numpy()
-        #mag = np.sqrt(dydt[:, 0]**2 + dydt[:, 1]**2).reshape(-1, 1)
-        #dydt = (dydt / mag)
-        #dydt = dydt.reshape(21, 21, 2)
-
-        #ax_vecfield.streamplot(x, y, dydt[:, :, 0], dydt[:, :, 1], color="black")
-        #ax_vecfield.set_xlim(-2, 2)
-        #ax_vecfield.set_ylim(-2, 2)
-
         fig.tight_layout()
         plt.savefig('png_alternate/{:04d}'.format(itr))
         plt.draw()
@@ -132,11 +106,11 @@ class ODEFunc(nn.Module):
         super(ODEFunc, self).__init__()
 
         self.net = nn.Sequential(
-            nn.Linear(2, 500),
+            nn.Linear(2, 1000),
             nn.Tanh(),
-            nn.Linear(500, 500),
+            nn.Linear(1000, 1000),
             nn.Tanh(),
-            nn.Linear(500, 1),
+            nn.Linear(1000, 1),
         )
 
         for m in self.net.modules():
