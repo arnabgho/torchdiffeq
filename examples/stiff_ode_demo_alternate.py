@@ -6,14 +6,17 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
-
+import numpy as np
 parser = argparse.ArgumentParser('ODE demo')
 parser.add_argument('--method', type=str, choices=['dopri5', 'adams'], default='dopri5')
 parser.add_argument('--data_size', type=int, default=1000)
-parser.add_argument('--batch_time', type=int, default=10)
+parser.add_argument('--batch_time', type=int, default=2)
 parser.add_argument('--batch_size', type=int, default=20)
 parser.add_argument('--niters', type=int, default=2000)
 parser.add_argument('--test_freq', type=int, default=20)
+parser.add_argument('--ntest', type=int, default=10)
+parser.add_argument('--num_skips', type=int, default=10)
+parser.add_argument('--skip_proportion', type=float, default=0.5)
 parser.add_argument('--viz', action='store_true')
 parser.add_argument('--gpu', type=int, default=0)
 parser.add_argument('--adjoint', action='store_true')
@@ -35,9 +38,9 @@ class Lambda(nn.Module):
 
     def forward(self, t, y):
         t = t.unsqueeze(0)
-        #equation = -1000*y + 3000 - 2000 * torch.exp(-t) #+ 1000 * torch.sin(t)
-        #equation = -1000*y + 3000 - 2000 * torch.exp(-t)
-        equation = 10 * torch.sin(t)
+        #equation = -1000*y + 3000 - 2000 * torch.exp(-t) + 1000 * torch.sin(t)
+        equation = -1000*y + 3000 - 2000 * torch.exp(-t)
+        #equation = 10 * torch.sin(t)
         return equation
         #return torch.mm(y**3, true_A)
         #return torch.mm(y**3, true_A)
@@ -67,7 +70,7 @@ if args.viz:
     fig = plt.figure(figsize=(12, 4), facecolor='white')
     ax_traj = fig.add_subplot(131, frameon=False)
     ax_phase = fig.add_subplot(132, frameon=False)
-    #ax_vecfield = fig.add_subplot(133, frameon=False)
+    #ax_multiple = fig.add_subplot(133, frameon=False)
     plt.show(block=False)
 
 
@@ -94,6 +97,18 @@ def visualize(true_y, pred_y, odefunc, itr):
         ax_phase.set_ylim(-100, 100)
         ax_phase.legend()
 
+        #ax_multiple.cla()
+        #ax_multiple.set_title('Variations')
+        #ax_multiple.set_xlabel('t')
+        #ax_multiple.set_ylabel('y')
+        #for component in pred_ys:
+        #    ax_multiple.plot(t.numpy(), component.numpy()[:, 0], '--')
+        #ax_multiple.set_xlim(t.min(), t.max())
+        #ax_multiple.set_ylim(-100, 100)
+        #ax_multiple.legend()
+
+
+
         fig.tight_layout()
         plt.savefig('png_alternate/{:04d}'.format(itr))
         plt.draw()
@@ -106,11 +121,11 @@ class ODEFunc(nn.Module):
         super(ODEFunc, self).__init__()
 
         self.net = nn.Sequential(
-            nn.Linear(2, 1000),
+            nn.Linear(2, 500),
             nn.Tanh(),
-            nn.Linear(1000, 1000),
+            nn.Linear(500, 500),
             nn.Tanh(),
-            nn.Linear(1000, 1),
+            nn.Linear(500, 1),
         )
 
         for m in self.net.modules():
@@ -176,6 +191,7 @@ if __name__ == '__main__':
                 pred_y = odeint(func, true_y0, t)
                 loss = torch.mean(torch.abs(pred_y - true_y))
                 print('Iter {:04d} | Total Loss {:.6f}'.format(itr, loss.item()))
+
                 visualize(true_y, pred_y, func, ii)
                 ii += 1
 
