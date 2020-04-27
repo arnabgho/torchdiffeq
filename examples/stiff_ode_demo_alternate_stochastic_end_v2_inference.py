@@ -182,8 +182,8 @@ if __name__ == '__main__':
     for itr in range(1, args.niters + 1):
         optimizer.zero_grad()
         batch_y0, batch_t, batch_y = get_batch()
-        pred_y = odeint_stochastic_end_v2(func, batch_y0, batch_t,shrink_proportion=args.shrink_proportion,shrink_std=args.shrink_std,mode='train')
-        #pred_y = odeint_stochastic_end_v2(func, batch_y0, batch_t)
+        #pred_y = odeint_stochastic_end_v2(func, batch_y0, batch_t,shrink_proportion=args.shrink_proportion,shrink_std=args.shrink_std,mode='train')
+        pred_y = odeint(func, batch_y0, batch_t)
         loss = torch.mean(torch.abs(pred_y - batch_y))
         loss.backward()
         optimizer.step()

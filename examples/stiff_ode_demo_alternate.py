@@ -39,7 +39,8 @@ class Lambda(nn.Module):
     def forward(self, t, y):
         t = t.unsqueeze(0)
         #equation = -1000*y + 3000 - 2000 * torch.exp(-t) + 1000 * torch.sin(t)
-        equation = -1000*y + 3000 - 2000 * torch.exp(-t)
+        #equation = -1000*y + 3000 - 2000 * torch.exp(-t)
+        equation = -1000*y + 3000 - 2000 * torch.exp(-1000*t)
         #equation = 10 * torch.sin(t)
         return equation
         #return torch.mm(y**3, true_A)

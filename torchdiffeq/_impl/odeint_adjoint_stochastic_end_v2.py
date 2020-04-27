@@ -88,6 +88,13 @@ def odeint_adjoint_stochastic_end_v2(func, y0, actual_t, rtol=1e-6, atol=1e-12, 
     else:
         integration_time[1]= t[0] + range_time
 
+    #print("actual_t")
+    #print(actual_t)
+    #print("integration_time")
+    #print(integration_time)
+    #print("=================")
+
+
     if rev:
         integration_time = reverse_time(integration_time)
 
@@ -96,8 +103,9 @@ def odeint_adjoint_stochastic_end_v2(func, y0, actual_t, rtol=1e-6, atol=1e-12, 
     return out
 
 def reverse_time(t):
-    temp = t[1]
-    t[1] = t[0]
-    t[0] = temp
+    temp1 = t[1].item()
+    temp0 = t[0].item()
+    t[1] = temp0
+    t[0] = temp1
     return t
 

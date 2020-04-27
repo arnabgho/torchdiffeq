@@ -71,11 +71,16 @@ def odeint_stochastic_end_v2_inference(func, y0, actual_t, rtol=1e-7, atol=1e-9,
     # output shape : (timesteps, batch_size, dimension)
     result = y0.unsqueeze(0)
     integration_time = torch.Tensor([0.0,1.0])
+    t = torch.Tensor([0.0,1.0])
 
     integration_time = integration_time.type_as(y0)#integration_time.type_as(x)
+    t = t.type_as(y0)#integration_time.type_as(x)
     for i in range(num_times-1):
         t[0] = actual_t[i]
         t[1] = actual_t[i+1]
+
+        if abs(t[1]-t[0])<min_length:
+            continue
         rev = False
 
         if t[1]<t[0]:
@@ -87,19 +92,35 @@ def odeint_stochastic_end_v2_inference(func, y0, actual_t, rtol=1e-7, atol=1e-9,
         integration_time[0]=t[0]
         integration_time[1]= t[0] + range_time
 
+        #print("integration_time")
+        #print(integration_time)
+
+        #print(t[1])
+        #print(t[0])
+
         if rev:
             integration_time = reverse_time(integration_time)
 
         out = odeint( func, y0, integration_time)
-        y0 = out[1].reshape(1,out.size(1))
+        #print("out.size()")
+        #print(out.size())
 
+        y0 = out[1].reshape_as(y0)
+
+        #print("result.size()")
+        #print(result.size())
+        #print("y0.size()")
+        #print(y0.size())
+        y0=y0.unsqueeze(0)
         result = torch.cat((result,y0),0)
+        y0=y0.squeeze(0)
     return result
 
 def reverse_time(t):
-    temp = t[1]
-    t[1] = t[0]
-    t[0] = temp
+    temp1 = t[1].item()
+    temp0 = t[0].item()
+    t[1] = temp0
+    t[0] = temp1
     return t
 #def odeint_skip_step(func, y0, t, rtol=1e-7, atol=1e-9, method=None, options=None, num_skips = 5, skip_proportion = 0.01  ):
 #    """Integrate a system of ordinary differential equations.

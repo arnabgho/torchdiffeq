@@ -26,7 +26,7 @@ SOLVERS = {
 
 
 
-def odeint_stochastic_end_v2(func, y0, actual_t, rtol=1e-7, atol=1e-9,  shrink_proportion = 0.5, shrink_std = 0.02, method=None, options=None, mode='train',min_length=0.01  ):
+def odeint_stochastic_end_v3(func, y0, actual_t, rtol=1e-7, atol=1e-9,  shrink_proportion = 0.5, shrink_std = 0.02, method=None, options=None, mode='train',min_length=0.001  ):
     """Integrate a system of ordinary differential equations.
 
     Solves the initial value problem for a non-stiff system of first order ODEs:
@@ -76,16 +76,27 @@ def odeint_stochastic_end_v2(func, y0, actual_t, rtol=1e-7, atol=1e-9,  shrink_p
     if t[1]<t[0]:
         t = reverse_time(t)
         rev = True
-    range_time = (t[1]-t[0]) * shrink_proportion
+    range_time = abs(t[1]-t[0]) - min_length
 
+    #print("range_time")
+    #print(range_time)
+    #print("shrink_std")
+    #print(shrink_std)
+    #print("shrink_proportion")
+    #print(shrink_proportion)
     #m = normal.Normal(t[0]+shrink_proportion, shrink_std)
-    m = uniform.Uniform(t[0] + range_time - shrink_std , t[0] + range_time + shrink_std)
+    #m = uniform.Uniform(t[1] - shrink_std , t[1] + shrink_std)
+    m = uniform.Uniform(t[1] - range_time , t[1] + range_time)
 
     integration_time[0]=t[0]
-    if mode=='train':
-        integration_time[1]=max(m.sample(), t[0] + min_length)
-    else:
-        integration_time[1]= t[0] + range_time
+    integration_time[1]= m.sample() #max(m.sample(), t[0] + min_length)#m.sample() #
+    #integration_time[1]= max(m.sample(), t[0] + min_length)#m.sample() #
+
+    #print("actual_t")
+    #print(actual_t)
+    #print("integration_time")
+    #print(integration_time)
+    #print("=================")
 
     if rev and mode=='train':
         integration_time = reverse_time(integration_time)

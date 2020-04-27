@@ -24,9 +24,9 @@ args = parser.parse_args()
 
 if args.adjoint:
     from torchdiffeq import odeint_adjoint as odeint
-    from torchdiffeq import odeint_adjoint_stochastic_end_v2 as odeint_stochastic_end_v2
+    from torchdiffeq import odeint_adjoint_stochastic_end_v3 as odeint_stochastic_end_v3
 else:
-    from torchdiffeq import odeint_stochastic_end_v2
+    from torchdiffeq import odeint_stochastic_end_v3
     from torchdiffeq import odeint
 
 device = torch.device('cuda:' + str(args.gpu) if torch.cuda.is_available() else 'cpu')
@@ -41,8 +41,8 @@ class Lambda(nn.Module):
     def forward(self, t, y):
         t = t.unsqueeze(0)
         #equation = -1000*y + 3000 - 2000 * torch.exp(-t) + 1000 * torch.sin(t)
+        #equation = -1000*y + 3000 - 2000 * torch.exp(-t)
         equation = -1000*y + 3000 - 2000 * torch.exp(-t)
-        #equation = -1000*y + 3000 - 2000 * torch.exp(-1000*t)
         #equation = 10 * torch.sin(t)
         return equation
         #return torch.mm(y**3, true_A)
@@ -68,7 +68,7 @@ def makedirs(dirname):
 
 
 if args.viz:
-    makedirs('png_alternate_stochastic_end_v2')
+    makedirs('png_alternate_stochastic_end_v3')
     import matplotlib.pyplot as plt
     fig = plt.figure(figsize=(12, 4), facecolor='white')
     ax_traj = fig.add_subplot(131, frameon=False)
@@ -113,7 +113,7 @@ def visualize(true_y, pred_y, odefunc, itr):
 
 
         fig.tight_layout()
-        plt.savefig('png_alternate_stochastic_end_v2/{:04d}'.format(itr))
+        plt.savefig('png_alternate_stochastic_end_v3/{:04d}'.format(itr))
         plt.draw()
         plt.pause(0.001)
 
@@ -181,7 +181,7 @@ if __name__ == '__main__':
     for itr in range(1, args.niters + 1):
         optimizer.zero_grad()
         batch_y0, batch_t, batch_y = get_batch()
-        pred_y = odeint_stochastic_end_v2(func, batch_y0, batch_t,shrink_proportion=args.shrink_proportion,shrink_std=args.shrink_std,mode='train')
+        pred_y = odeint_stochastic_end_v3(func, batch_y0, batch_t,shrink_proportion=args.shrink_proportion,shrink_std=args.shrink_std,mode='train')
         #pred_y = odeint_stochastic_end_v2(func, batch_y0, batch_t)
         loss = torch.mean(torch.abs(pred_y - batch_y))
         loss.backward()

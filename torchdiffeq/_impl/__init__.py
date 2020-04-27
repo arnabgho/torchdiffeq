@@ -2,6 +2,7 @@ from .odeint import odeint
 from .odeint_skip_step import odeint_skip_step
 from .odeint_stochastic_end import odeint_stochastic_end
 from .odeint_stochastic_end_v2 import odeint_stochastic_end_v2
+from .odeint_stochastic_end_v3 import odeint_stochastic_end_v3
 from .odeint_adjoint_skip_step import odeint_adjoint_skip_step
 from .odeint_adjoint_stochastic_end import odeint_adjoint_stochastic_end
 from .odeint_adjoint_stochastic_end_v2 import odeint_adjoint_stochastic_end_v2
