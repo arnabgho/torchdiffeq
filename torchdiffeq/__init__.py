@@ -7,4 +7,5 @@ from ._impl import odeint_stochastic_end_v3
 from ._impl import odeint_adjoint_skip_step
 from ._impl import odeint_adjoint_stochastic_end
 from ._impl import odeint_adjoint_stochastic_end_v2
+from ._impl import odeint_adjoint_stochastic_end_v3
 from ._impl import odeint_stochastic_end_v2_inference
