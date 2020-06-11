@@ -16,12 +16,13 @@ parser.add_argument('--niters', type=int, default=2000)
 parser.add_argument('--test_freq', type=int, default=20)
 parser.add_argument('--ntest', type=int, default=10)
 parser.add_argument('--num_skips', type=int, default=10)
+parser.add_argument('--stiffness_ratio', type=float, default=1000.0)
 parser.add_argument('--skip_proportion', type=float, default=0.5)
 parser.add_argument('--viz', action='store_true')
 parser.add_argument('--gpu', type=int, default=0)
 parser.add_argument('--adjoint', action='store_true')
 args = parser.parse_args()
-
+torch.manual_seed(6)
 if args.adjoint:
     from torchdiffeq import odeint_adjoint as odeint
 else:
@@ -40,7 +41,7 @@ class Lambda(nn.Module):
         t = t.unsqueeze(0)
         #equation = -1000*y + 3000 - 2000 * torch.exp(-t) + 1000 * torch.sin(t)
         #equation = -1000*y + 3000 - 2000 * torch.exp(-t)
-        equation = -1000*y + 3000 - 2000 * torch.exp(-1000*t)
+        equation = -1*y*args.stiffness_ratio + 3*args.stiffness_ratio - 2*args.stiffness_ratio * torch.exp(-1*t)
         #equation = 10 * torch.sin(t)
         return equation
         #return torch.mm(y**3, true_A)
@@ -170,7 +171,7 @@ if __name__ == '__main__':
     ii = 0
 
     func = ODEFunc()
-    optimizer = optim.RMSprop(func.parameters(), lr=1e-3)
+    optimizer = optim.RMSprop(func.parameters(), lr=5e-4)
     end = time.time()
 
     time_meter = RunningAverageMeter(0.97)
